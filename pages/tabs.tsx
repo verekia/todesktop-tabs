@@ -250,7 +250,7 @@ export default function Tabs() {
       {/* New Tab Button */}
       <button
         onClick={createNewTab}
-        className="w-8 h-8 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center text-lg font-semibold text-gray-600 hover:text-gray-800 transition-colors"
+        className="w-8 h-8 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center text-lg font-semibold text-gray-600 hover:text-gray-800 transition-colors app-no-drag"
         title="New Tab"
       >
         +
