@@ -20,7 +20,6 @@ body {
 .tab-container {
   user-select: none;
   -webkit-user-select: none;
-  -webkit-app-region: no-drag;
 }
 
 /* Custom scrollbar for tab overflow */
@@ -39,4 +38,46 @@ body {
 
 .tab-overflow::-webkit-scrollbar-thumb:hover {
   background: rgba(0, 0, 0, 0.3);
+}
+
+@utility app-drag {
+  -webkit-app-region: drag;
+  /* background-color: #faa; */
+}
+
+@utility app-no-drag {
+  -webkit-app-region: no-drag;
+}
+
+@custom-variant todesktop {
+  html.todesktop & {
+    @slot;
+  }
+}
+
+@utility app-draggable-except-children {
+  -webkit-app-region: drag;
+  /* background-color: #faa; */
+  & > * {
+    -webkit-app-region: no-drag;
+    /* background-color: white; */
+  }
+}
+
+@custom-variant todesktop-windows {
+  html.todesktop.todesktop-platform-win32 & {
+    @slot;
+  }
+}
+
+@custom-variant todesktop-mac {
+  html.todesktop.todesktop-platform-darwin & {
+    @slot;
+  }
+}
+
+@custom-variant todesktop-linux {
+  html.todesktop.todesktop-platform-linux & {
+    @slot;
+  }
 }

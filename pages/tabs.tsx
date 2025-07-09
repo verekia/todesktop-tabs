@@ -214,9 +214,9 @@ export default function Tabs() {
   }, [tabs, activeTabId]);
 
   return (
-    <div className="bg-gray-100 border-b border-gray-300 h-20 flex items-center px-4 gap-2 tab-container">
+    <div className="bg-gray-100 border-b border-gray-300 h-20 flex items-center px-4 gap-2 tab-container app-drag">
       {/* Tab Bar */}
-      <div className="flex gap-1 flex-1 overflow-x-auto tab-overflow">
+      <div className="flex gap-1 flex-1 overflow-x-auto tab-overflow app-draggable-except-children">
         {tabs.map((tab) => (
           <div
             key={tab.id}
