@@ -167,19 +167,24 @@ export default function Tabs() {
     if (!tab) return;
 
     try {
+      // await nativeWindow.close({ ref: tab.viewRef }); // channels:api o[r] is not a function
+
+      // tab.webContents?.close(); // close is not a function (so it has the wrong type)
+      // console.log(tab.webContents);
+
       // Remove the view from the window first
-      if (tab.viewRef) {
-        await nativeWindow.removeBrowserView({ viewRef: tab.viewRef });
-      }
+      // if (tab.viewRef) {
+      //   await nativeWindow.removeBrowserView({ viewRef: tab.viewRef });
+      // }
 
       // Attempt to explicitly destroy the WebContents to free renderer process
-      if (tab.webContents) {
-        tab.webContents.close?.();
-      }
+      // if (tab.webContents) {
+      //   tab.webContents.close?.();
+      // }
 
-      // THis is not the normal webContents object.
+      // This is not the normal webContents object.
       // console.log(tab.webContents);
-      nativeWindow.close({ ref: tab.viewRef });
+      // nativeWindow.close({ ref: tab.viewRef });
       // console.log(;
 
       // Remove our references to allow garbage collection
