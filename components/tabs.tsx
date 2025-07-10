@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { views, webContents, nativeWindow } from "@todesktop/client-core";
 import type { Ref } from "@todesktop/client-core/invoke";
 import type { WebContents } from "@todesktop/client-electron-types";
@@ -17,7 +17,7 @@ export default function Tabs() {
     {
       id: "1",
       title: "Projects",
-      url: "http://localhost:5173",
+      url: "http://localhost:3000/some-page",
       isActive: true,
     },
   ]);
@@ -74,54 +74,57 @@ export default function Tabs() {
     }
   };
 
-  const createNewTab = async () => {
-    const newTabId = Date.now().toString();
-    const newTab: Tab = {
-      id: newTabId,
-      title: "New Tab",
-      url: "http://localhost:5173",
-      isActive: false,
-    };
-
-    try {
-      const viewRef = await views.create({
-        webPreferences: {
-          nodeIntegration: false,
-          contextIsolation: true,
-        },
-      });
-
-      // Add the view to the current window
-      await nativeWindow.addBrowserView({ viewRef });
-
-      // Set bounds for the view
-      await views.setBounds({
-        ref: viewRef,
-        bounds: {
-          x: 0,
-          y: 80,
-          width: window.innerWidth,
-          height: window.innerHeight - 80,
-        },
-      });
-
-      const webContentsObj = await views.getWebContents({ ref: viewRef });
-      await webContents.loadURL({ ref: webContentsObj as any }, newTab.url);
-
-      // TODO: Add page title updates when ToDesktop API supports it
-
-      const tabWithView = {
-        ...newTab,
-        viewRef,
-        webContents: webContentsObj,
+  const createNewTab = useCallback(
+    async (url = "http://localhost:3000/some-page") => {
+      const newTabId = Date.now().toString();
+      const newTab: Tab = {
+        id: newTabId,
+        title: "New Tab",
+        url,
+        isActive: false,
       };
 
-      setTabs((prev) => [...prev, tabWithView]);
-      switchToTab(newTabId);
-    } catch (error) {
-      console.error("Error creating new tab:", error);
-    }
-  };
+      try {
+        const viewRef = await views.create({
+          webPreferences: {
+            nodeIntegration: false,
+            contextIsolation: true,
+          },
+        });
+
+        // Add the view to the current window
+        await nativeWindow.addBrowserView({ viewRef });
+
+        // Set bounds for the view
+        await views.setBounds({
+          ref: viewRef,
+          bounds: {
+            x: 0,
+            y: 80,
+            width: window.innerWidth,
+            height: window.innerHeight - 80,
+          },
+        });
+
+        const webContentsObj = await views.getWebContents({ ref: viewRef });
+        await webContents.loadURL({ ref: webContentsObj as any }, newTab.url);
+
+        // TODO: Add page title updates when ToDesktop API supports it
+
+        const tabWithView = {
+          ...newTab,
+          viewRef,
+          webContents: webContentsObj,
+        };
+
+        setTabs((prev) => [...prev, tabWithView]);
+        switchToTab(newTabId);
+      } catch (error) {
+        console.error("Error creating new tab:", error);
+      }
+    },
+    []
+  );
 
   const switchToTab = async (tabId: string) => {
     const tab = tabs.find((t) => t.id === tabId);
@@ -164,11 +167,23 @@ export default function Tabs() {
     if (!tab) return;
 
     try {
-      // Remove the view from the window
+      // Remove the view from the window first
       if (tab.viewRef) {
         await nativeWindow.removeBrowserView({ viewRef: tab.viewRef });
       }
 
+      // Attempt to explicitly destroy the WebContents to free renderer process
+      if (tab.webContents) {
+        tab.webContents.close?.();
+      }
+
+      // THis is not the normal webContents object.
+      // console.log(tab.webContents);
+      nativeWindow.close({ ref: tab.viewRef });
+      // console.log(;
+
+      // Remove our references to allow garbage collection
+      // The renderer process will be cleaned up by GC when no references remain
       const newTabs = tabs.filter((t) => t.id !== tabId);
       setTabs(newTabs);
 
@@ -178,6 +193,11 @@ export default function Tabs() {
       } else if (newTabs.length === 0) {
         // Create a new tab if all tabs are closed
         createNewTab();
+      }
+
+      // Force garbage collection if available (development only)
+      if (typeof window !== "undefined" && "gc" in window) {
+        (window as any).gc();
       }
     } catch (error) {
       console.error("Error closing tab:", error);
@@ -212,6 +232,51 @@ export default function Tabs() {
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, [tabs, activeTabId]);
+
+  // Listen for broadcast messages to create new tabs
+  useEffect(() => {
+    const bc = new BroadcastChannel("test_channel");
+
+    const handler = (event: MessageEvent) => {
+      const data = event.data;
+      if (data === "NEW_TAB" || data?.type === "NEW_TAB") {
+        const url =
+          typeof data === "string" ? undefined : data?.url ?? undefined;
+        createNewTab(url);
+      }
+    };
+
+    bc.addEventListener("message", handler);
+    return () => {
+      bc.removeEventListener("message", handler);
+      bc.close();
+    };
+  }, [createNewTab]);
+
+  // Cleanup all tabs when component unmounts
+  useEffect(() => {
+    return () => {
+      // Cleanup function to remove all views when the component unmounts
+      tabs.forEach(async (tab) => {
+        if (tab.viewRef) {
+          try {
+            await nativeWindow.removeBrowserView({ viewRef: tab.viewRef });
+          } catch (error) {
+            console.warn("Error removing view on unmount:", error);
+          }
+        }
+
+        if (tab.webContents) {
+          try {
+            // @ts-ignore – destroy exists at runtime
+            (tab.webContents as any).destroy();
+          } catch (error) {
+            console.warn("Error destroying webContents on unmount:", error);
+          }
+        }
+      });
+    };
+  }, []);
 
   return (
     <div className="bg-gray-100 border-b border-gray-300 h-20 flex items-center px-4 gap-2 tab-container app-drag">
@@ -249,7 +314,7 @@ export default function Tabs() {
 
       {/* New Tab Button */}
       <button
-        onClick={createNewTab}
+        onClick={() => createNewTab()}
         className="w-8 h-8 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center text-lg font-semibold text-gray-600 hover:text-gray-800 transition-colors app-no-drag"
         title="New Tab"
       >

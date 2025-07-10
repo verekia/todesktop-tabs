@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import Tabs from "./tabs";
+import Tabs from "../components/tabs";
 
 export default function Home() {
   useEffect(() => {
